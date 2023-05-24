@@ -117,7 +117,7 @@ def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evalua
     return TP, FP, FN
 
 def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train, show_plot,
-             threshold, batch_size, epochs):
+             gpus, threshold, batch_size, epochs):
     logo = LeaveOneGroupOut()
     logo.get_n_splits(X, y, groupsLabel)
     subject_count = 0
@@ -138,7 +138,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         path = 'Model_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '/'
         lightningModel = TransformerLightning()
         trainer = pl.Trainer(limit_train_batches=500, max_epochs=epochs,
-                             default_root_dir=path, callbacks=callbacks)
+                             default_root_dir=path, callbacks=callbacks, gpus=gpus)
         test_dataloader = getDataloader(X_test, y_test, False, 1)
         if(train):
             train_loader = getDataloader(X_train, y_train, True, batch_size)

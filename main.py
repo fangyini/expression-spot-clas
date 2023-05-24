@@ -20,6 +20,7 @@ def main(config):
     show_plot = config.show_plot
     batch_size = config.batch_size
     epochs = config.epochs
+    gpus = config.gpus
     
     print(' ------ Spotting', dataset_name, expression_type, '-------')
 
@@ -56,14 +57,14 @@ def main(config):
     print('\n ------ SOFTNet Training & Testing ------')
     train = True
     TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train,
-                                     show_plot, threshold=0.7, batch_size=batch_size, epochs=epochs)
+                                     show_plot, gpus, threshold=0.7, batch_size=batch_size, epochs=epochs)
     final_evaluation(TP, FP, FN, metric_fn)
     print('previous p is: 0.7.')
     fortestingp = np.arange(0.7, 1, 0.05)
     for p in fortestingp:
         TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset,
                                          False,
-                                         show_plot, threshold=p, batch_size=batch_size, epochs=epochs)
+                                         show_plot, gpus, threshold=p, batch_size=batch_size, epochs=epochs)
         final_evaluation(TP, FP, FN, metric_fn)
         print('previous p is: ' + str(p))
 
@@ -78,6 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--show_plot', type=bool, default=True)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--epochs', type=int, default=500)
+    parser.add_argument('--gpus', type=str, default=1)
 
     config = parser.parse_args()
     main(config)
