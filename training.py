@@ -1,23 +1,16 @@
-from tensorflow import keras
-from tensorflow.keras import layers
-from sklearn.utils import class_weight
-import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
-import cv2
-from skimage.util import random_noise
-from skimage.transform import rotate
 import random
-from collections import Counter
 from sklearn.model_selection import LeaveOneGroupOut
 from scipy.signal import find_peaks
 from Utils.mean_average_precision.mean_average_precision import MeanAveragePrecision2d
+import pytorch_lightning as pl
+from model.trainer import getDataloader, TransformerLightning, getCallbacks
+import torch
 seed=666
 random.seed(seed)
 np.random.seed(seed)
-tf.random.set_seed(seed)
-inputSize=30
-
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def pseudo_labeling(final_images, final_samples, k):
     pseudo_y = []
@@ -69,79 +62,9 @@ def loso(dataset, pseudo_y, final_images, final_samples, k):
     X = [frame for video in dataset for frame in video]
     print('\nTotal X:', len(X), ', Total y:', len(y))
     return X, y, groupsLabel
-    
-def normalize(images):
-    for index in range(len(images)):
-        for channel in range(3):
-            images[index][:,:,channel] = cv2.normalize(images[index][:,:,channel], None, alpha=0, beta=1,norm_type=cv2.NORM_MINMAX)
-    return images
 
-def generator(X, y, batch_size=12, epochs=1):
-    while True:
-        for start in range(0, len(X), batch_size):
-            end = min(start + batch_size, len(X))
-            num_images = end - start
-            #X[start:end] = normalize(X[start:end])
-            u = np.array(X[start:end])[:,:,:,0].reshape(num_images,inputSize,inputSize,1)
-            v = np.array(X[start:end])[:,:,:,1].reshape(num_images,inputSize,inputSize,1)
-            os = np.array(X[start:end])[:,:,:,2].reshape(num_images,inputSize,inputSize,1)
-            yield [u, v, os], np.array(y[start:end])
-            
-def shuffling(X, y):
-    shuf = list(zip(X, y))
-    random.shuffle(shuf)
-    X, y = zip(*shuf)
-    return list(X), list(y)
 
-def data_augmentation(X, y):
-    transformations = {
-        0: lambda image: np.fliplr(image),
-        1: lambda image: random_noise(image),
-        2: lambda image: cv2.GaussianBlur(image, (5,5), 0), #todo: decrease a aug type
-    }
-    y1=y.copy()
-    for index, label in enumerate(y1):
-        if (label==1): #Only augment on expression samples (label=1)
-            for augment_type in range(3):
-                img_transformed = transformations[augment_type](X[index]).reshape(inputSize,inputSize,3)
-                X.append(np.array(img_transformed))
-                y.append(1)
-    return X, y
-
-def SOFTNet():
-    inputs = layers.Input(shape=(inputSize,inputSize,3))
-    inputs1=inputs[:,:,:,0:1]
-    conv1 = layers.Conv2D(3, (3,3), padding='same', activation='relu')(inputs1)
-    pool1 = layers.MaxPooling2D(pool_size=(3, 3), strides=(3,3))(conv1)
-    #pool1 = layers.Dropout(0.2)(pool1)
-    # channel 2
-    inputs2 = inputs[:,:,:,1:2] # layers.Input(shape=(inputSize,inputSize,1))
-    conv2 = layers.Conv2D(5, (3,3), padding='same', activation='relu')(inputs2)
-    pool2 = layers.MaxPooling2D(pool_size=(3, 3), strides=(3,3))(conv2)
-    #pool2=layers.Dropout(0.2)(pool2)
-    # channel 3
-    inputs3 = inputs[:,:,:,2:3] # layers.Input(shape=(inputSize,inputSize,1))
-    conv3 = layers.Conv2D(8, (3,3), padding='same', activation='relu')(inputs3)
-    pool3 = layers.MaxPooling2D(pool_size=(3, 3), strides=(3,3))(conv3)
-    #pool3 = layers.Dropout(0.2)(pool3)
-    # merge
-    merged = layers.Concatenate()([pool1, pool2, pool3])
-    # interpretation
-    merged_pool = layers.MaxPooling2D(pool_size=(2, 2), strides=(2,2))(merged)
-    flat = layers.Flatten()(merged_pool)
-    dense = layers.Dense(400, activation='relu')(flat)
-    outputs = layers.Dense(1, activation='linear')(dense)
-    #outputs=keras.activations.sigmoid(outputs), add BN with sigmoid
-    #Takes input u,v,s
-    model = keras.models.Model(inputs=inputs, outputs=outputs)
-    # compile
-    sgd = keras.optimizers.Adam(lr=0.0001)
-    model.compile(loss="mse", optimizer=sgd, metrics=[tf.keras.metrics.MeanAbsoluteError()])
-    #tf.keras.losses.BinaryCrossentropy(from_logits=True)
-    #'mse'
-    return model
-
-def spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot):
+def spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot, path):
     prev=0
     for videoIndex, video in enumerate(final_samples[subject_count-1]):
         preds = []
@@ -179,12 +102,13 @@ def spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_
                 plt.axhline(y=threshold, color='g')
         if(show_plot):
             #plt.show()
-            plt.savefig('CASME_sq/output/img_'+str(countVideo+videoIndex)+'.png')
-            np.save('CASME_sq/output/arr_'+str(countVideo+videoIndex)+'.npy', score_plot_agg)
+            plt.savefig(path+'/img_'+str(countVideo+videoIndex)+'.png')
+            np.save(path+'/arr_'+str(countVideo+videoIndex)+'.npy', score_plot_agg)
         prev += len(dataset[countVideo+videoIndex])
         metric_fn.add(np.array(preds),np.array(gt)) #IoU = 0.5 according to MEGC2020 metrics
     return preds, gt, total_gt
-        
+
+
 def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evaluation
     TP = int(sum(metric_fn.value(iou_thresholds=0.5)[0.5][0]['tp'])) 
     FP = int(sum(metric_fn.value(iou_thresholds=0.5)[0.5][0]['fp']))
@@ -193,18 +117,14 @@ def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evalua
     return TP, FP, FN
 
 def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train, show_plot,
-             threshold):
+             threshold, batch_size, epochs):
     logo = LeaveOneGroupOut()
     logo.get_n_splits(X, y, groupsLabel)
     subject_count = 0
-    epochs = 1000
-    batch_size = 1000
     total_gt = 0
     metric_fn = MeanAveragePrecision2d(num_classes=1)
     p = threshold #From our analysis, 0.55 achieved the highest F1-Score
-    model = SOFTNet()
-    weight_reset = model.get_weights() #Initial weights
-    callback = tf.keras.callbacks.EarlyStopping(monitor='val_mean_absolute_error', patience=10, restore_best_weights=True)
+    callbacks = getCallbacks()
 
     for train_index, test_index in logo.split(X, y, groupsLabel): # Leave One Subject Out
         subject_count+=1
@@ -213,83 +133,39 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         X_train, X_test = [X[i] for i in train_index], [X[i] for i in test_index] #Get training set
         y_train, y_test = [y[i] for i in train_index], [y[i] for i in test_index] #Get testing set
         
-        print('------Initializing SOFTNet-------') #To reset the model at every LOSO testing
+        print('------Initializing the model-------') #To reset the model at every LOSO testing
         
-        path = 'SOFTNet_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '.hdf5'
+        path = 'Model_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '/'
+        lightningModel = TransformerLightning()
+        trainer = pl.Trainer(limit_train_batches=500, max_epochs=epochs,
+                             default_root_dir=path, callbacks=callbacks)
+        test_dataloader = getDataloader(X_test, y_test, False, 1)
         if(train):
-            #Downsampling non expression samples the dataset by 1/2 to reduce dataset bias 
-            print('Dataset Labels', Counter(y_train))
-            unique, uni_count = np.unique(y_train, return_counts=True) 
-            rem_count = int(uni_count.max()*0.5)
-            
-            
-            #Randomly remove non expression samples (With label 0) from dataset
-            rem_index = random.sample([index for index, i in enumerate(y_train) if i==0], rem_count) 
-            rem_index += (index for index, i in enumerate(y_train) if i>0)
-            rem_index.sort()
-            X_train = [X_train[i] for i in rem_index]
-            y_train = [y_train[i] for i in rem_index]
-            print('After Downsampling Dataset Labels', Counter(y_train))
-            
-            #Data augmentation to the micro-expression samples only
-            if (expression_type == 'micro-expression'):
-                X_train, y_train = data_augmentation(X_train, y_train)
-                print('After Augmentation Dataset Labels', Counter(y_train))
-                
-            #Shuffle the training set
-            X_train, y_train = shuffling(X_train, y_train)
-            class_weights = class_weight.compute_class_weight('balanced',
-                                                              np.unique(y_train),
-                                                              y_train)
-            class_weight_dict = dict(enumerate(class_weights))
+            train_loader = getDataloader(X_train, y_train, True, batch_size)
+            trainer.fit(lightningModel, train_loader, test_dataloader)
 
-            #print('class weight', str(class_weight_dict))
-            model.set_weights(weight_reset) #Reset weights to ensure the model does not have info about current subject
-            '''model.fit(
-                generator(X_train, y_train, batch_size, epochs),
-                #steps_per_epoch = None,#len(X_train)/batch_size,
-                epochs=epochs,
-                verbose=2,
-                validation_data = generator(X_test, y_test, batch_size),
-                #validation_steps = len(X_test)/batch_size,
-                shuffle=True,
-                callbacks=[callback],
-                class_weight=class_weight_dict
-            )'''
-            model.fit(
-                np.array(X_train),
-                np.array(y_train),
-                batch_size,
-                epochs,
-                verbose=2,
-                validation_data=(np.array(X_test), np.array(y_test)),
-                shuffle=True,
-                callbacks=[callback],
-                class_weight=class_weight_dict
-            )
-            model.save(path)
-        else:
-            model.load_weights(path)  #Load Pretrained Weights
-        
-        '''result = model.predict_generator(
-            generator(X_test, y_test, batch_size),
-            #steps=None, #len(X_test)/batch_size,
-            verbose=1
-        )'''
-        result = model.predict(np.array(X_test),verbose=0)
+        # load best model
+        checkpoint = path + 'lightning_logs/version_0/checkpoints/last.ckpt'
+        lightningModel_best = TransformerLightning.load_from_checkpoint(checkpoint)
+        model = lightningModel_best.model
+        model.eval()
 
-        # ADD NEW BELOW:
-        #X_test: len of 104, each one 42,42,3
-        # result: 104, 1
-        #X_test=normalize(X_test) #todo: to add this??
-        #X_test=np.stack(X_test)
-        #result=X_test.mean(axis=(1,2,3)).reshape(-1,1)
+        result = []
+        for test_x, _ in test_dataloader:
+            test_x.to(DEVICE)
+            output = model(test_x)[0] # 2, 512
+            result.extend(output)
+        result = torch.stack(result).unsqueeze(1)
+        result = result.cpu().detach().numpy()
+        assert result.shape[0] == len(y_test)
 
-        preds, gt, total_gt = spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot)
+        preds, gt, total_gt = spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot,
+                                       path)
         TP, FP, FN = evaluation(preds, gt, total_gt, metric_fn)
         
         print('Done Subject', subject_count)
-        del X_train, X_test, y_train, y_test, result
+        del X_train, X_test, y_train, y_test, result, lightningModel, trainer
+        quit()
     return TP, FP, FN, metric_fn
 
 def final_evaluation(TP, FP, FN, metric_fn):

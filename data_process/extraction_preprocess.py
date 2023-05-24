@@ -5,7 +5,6 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 import pandas as pd
 import cv2
 import dlib
-import mat73
 import scipy.io
 
 
@@ -46,8 +45,6 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
         if not fromSaved:
             phase = readPhase(videoName, dataset_name, k)
             phase = phase.transpose(2,3,0,1)
-            #amp = amp.transpose(2, 0, 1)
-            #amp_average = amp.mean(axis=0)+1.645*amp.std(axis=0) #57,57 X=μ + 1.645σ
             phase_cos = phase[0]
             phase_sin = phase[1] #len, H, W
 
@@ -64,12 +61,12 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
                         detect = face_detector(reference_img, 1)
                     shape = face_pose_predictor(reference_img, detect[0])
                     shape=shape_to_np(shape)
-                    for _ in range(0):
+                    for _ in range(2):
                         shape=(shape/2-0.5).astype(int)
                     # x is 0, y is 1
-                    pad1 = 16
-                    sizeF = 111
-                    pad2 = 12
+                    pad1 = 4
+                    sizeF = 27
+                    pad2 = 3
                     # Left Eye
                     x11 = max(shape[36][0] - pad1, 0)
                     y11 = shape[36][1]
@@ -116,10 +113,6 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
                     x53 = min(shape[64][0] + pad2, sizeF)
                     y54 = min(shape[57][1] + pad2, sizeF)
 
-                    # Nose landmark
-                    x61 = shape[28][0]
-                    y61 = shape[28][1]
-
                 # phase difference from [video][img_count] to [video][img_count+k]
                 cosdiff = phase_cos[(img_count+1):(img_count+k)].sum(axis=0)
                 sindiff = phase_sin[(img_count+1):(img_count+k)].sum(axis=0)
@@ -143,32 +136,10 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
                 cosdiff=(cosdiff-cosdiff.mean())/cosdiff.std()
                 sindiff = (sindiff - sindiff.mean())/sindiff.std()
                 magnitude = (cosdiff ** 2 + sindiff ** 2) ** 0.5
-                #osx = computeStrain(cosdiff, sindiff)
                 final_image[:,:,2]=magnitude
 
-                '''import seaborn as sns
-                import matplotlib.pyplot as plt
-                ax = sns.heatmap(osx, vmin=0)
-                plt.show()
-                quit()'''
-
-                # Features Concatenation into 128x128x3
-                '''final = np.zeros((30, 30, 3))
-                final[:, :, 0] = cv2.resize(cosdiff, (30,30))
-                final[:, :, 1] = cv2.resize(sindiff, (30,30))
-                final[:, :, 2] = cv2.resize(magnitude, (30, 30))'''
-
-                # Remove global head movement by minus nose region
-                #final[:, :, 0] = abs(final[:, :, 0] - final[y61 - 1:y61 + 2, x61 - 1:x61 + 2, 0].mean())
-                #final[:, :, 1] = abs(final[:, :, 1] - final[y61 - 1:y61 + 2, x61 - 1:x61 + 2, 1].mean())
-                #final[:, :, 2] = abs(final[:, :, 2] - final[y61 - 1:y61 + 2, x61 - 1:x61 + 2, 2].mean())
-
-                '''import seaborn as sns
-                import matplotlib.pyplot as plt
-                ax = sns.heatmap(final[:,:,2])
-                plt.show()
-                quit()'''
-
+                for index in range(3):
+                    final_image[:,:,index] = cv2.normalize(final_image[:,:,index], None, alpha=0, beta=1,norm_type=cv2.NORM_MINMAX)
                 OFF_video.append(final_image) #changed to 128,128,3
             # final image: 42,42,3; final: 128,128,3
         '''if not fromSaved:
@@ -180,17 +151,6 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
     print('All Done')
     return dataset
 
-
-def readMatlab(videoName):
-    path = 'CASME_sq/phases/' + videoName + '.mat'
-    try:
-        riesz_features = mat73.loadmat(path)
-    except:
-        riesz_features = scipy.io.loadmat(path)
-    phase = riesz_features['output'][0]
-    amp=riesz_features['output'][1]
-    return phase, amp
-
 def readPhase(videoName, dataset_name, k):
-    phase = np.load(dataset_name + '/graphData_k' + str(k) + '_phase_openface_level1/' + videoName + '_node.npy')
+    phase = np.load(dataset_name + '/graphData_k' + str(k) + '_phase_openface/' + videoName + '_node.npy')
     return phase

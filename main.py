@@ -1,8 +1,8 @@
 import sys
 import argparse
-from load_images import *
-from load_label import *
-from extraction_preprocess import *
+from data_process.load_images import *
+from data_process.load_label import *
+from data_process.extraction_preprocess import *
 from training import *
 # Import the os module
 import os
@@ -18,6 +18,8 @@ def main(config):
     expression_type = config.expression_type
     train = config.train
     show_plot = config.show_plot
+    batch_size = config.batch_size
+    epochs = config.epochs
     
     print(' ------ Spotting', dataset_name, expression_type, '-------')
 
@@ -31,15 +33,11 @@ def main(config):
     final_images, final_videos, final_subjects, final_samples, final_names = load_gt(dataset_name, expression_type, images,
                                                                         subjectsVideos, subjects, codeFinal,
                                                                         videoNames)
-    print('total subjects: ', len(subjects))
-    print('total videos: ', len(images))
-    print('related emotions: ', np.sum([len(x[0]) for x in final_samples]))
-    print('related subjects ', len(final_subjects))
-    print('related videos: ', len(final_images))
-    quit()
 
     print('\n ------ Computing k ------')
-    k = cal_k(dataset_name, expression_type, final_samples)
+    #k = cal_k(dataset_name, expression_type, final_samples)
+    k = 6
+    print('hardcoded k = 6')
     
     # Feature Extraction & Pre-processing
     print('\n ------ Feature Extraction & Pre-processing ------')
@@ -58,14 +56,14 @@ def main(config):
     print('\n ------ SOFTNet Training & Testing ------')
     train = True
     TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train,
-                                     show_plot, threshold=0.7)
+                                     show_plot, threshold=0.7, batch_size=batch_size, epochs=epochs)
     final_evaluation(TP, FP, FN, metric_fn)
     print('previous p is: 0.7.')
     fortestingp = np.arange(0.7, 1, 0.05)
     for p in fortestingp:
         TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset,
                                          False,
-                                         show_plot, threshold=p)
+                                         show_plot, threshold=p, batch_size=batch_size, epochs=epochs)
         final_evaluation(TP, FP, FN, metric_fn)
         print('previous p is: ' + str(p))
 
@@ -78,6 +76,8 @@ if __name__ == '__main__':
     parser.add_argument('--expression_type', type=str, default='micro-expression') # Specify micro-expression or macro-expression only
     parser.add_argument('--train', type=bool, default=True) #Train or use pre-trained weight for prediction
     parser.add_argument('--show_plot', type=bool, default=True)
-    
+    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--epochs', type=int, default=500)
+
     config = parser.parse_args()
     main(config)
