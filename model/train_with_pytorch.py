@@ -43,7 +43,7 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
     epoch_number = 0
 
     best_vloss = 1_000_000.
-    total_havent_change = 15
+    total_havent_change = 5
     havent_change = 0
 
     for epoch in range(EPOCHS):

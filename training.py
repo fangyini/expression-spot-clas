@@ -121,8 +121,9 @@ def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evalua
     print('TP:', TP, 'FP:', FP, 'FN:', FN)
     return TP, FP, FN
 
-def getSampleWeight(y_train, y_test):
+def getSampleWeight(y_train, y_test, ratio):
     class_sample_count = np.unique(y_train, return_counts=True)[1]
+    class_sample_count[0] = int(class_sample_count[0] * ratio)
     weight = 1. / class_sample_count
     samples_weight_train = weight[y_train]
     samples_weight_test = weight[y_test]
@@ -153,6 +154,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
     total_gt = 0
     metric_fn = MeanAveragePrecision2d(num_classes=1)
     p = threshold #From our analysis, 0.55 achieved the highest F1-Score
+    ratio = 0.5
 
     for train_index, test_index in logo.split(X, y, groupsLabel): # Leave One Subject Out
         subject_count+=1
@@ -166,16 +168,15 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         path = 'Model_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '/'
         if os.path.exists(path) == False:
             os.mkdir(path)
-        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test)
+        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, ratio)
         test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
         model = Multitask_transformer(disable_transformer, num_decoder_layers=4, emb_size=576, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
         model.to(DEVICE)
         if(train):
             # todo: data agumentation
-            new_index = delete_label_zero(y_train, 0.3, window_length)
+            new_index = delete_label_zero(y_train, ratio, window_length)
             random.shuffle(new_index)
-            # 1. delete zeros
             # 2. if (expression_type == 'micro-expression'):
             #                 X_train, y_train = data_augmentation(X_train, y_train)
             #                 print('After Augmentation Dataset Labels', Counter(y_train))
@@ -188,7 +189,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
 
         result = []
         for test_x, _, _ in test_dataloader:
-            test_x.to(DEVICE)
+            test_x = test_x.to(DEVICE)
             output = model(test_x)[0] # 2, 512
             result.extend(output)
         result = torch.stack(result).unsqueeze(1)
