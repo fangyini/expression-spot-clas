@@ -21,6 +21,8 @@ def main(config):
     batch_size = config.batch_size
     epochs = config.epochs
     gpus = config.gpus
+    window_length = config.window_length
+    disable_transformer = config.disable_transformer
     
     print(' ------ Spotting', dataset_name, expression_type, '-------')
 
@@ -57,14 +59,14 @@ def main(config):
     print('\n ------ SOFTNet Training & Testing ------')
     train = True
     TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train,
-                                     show_plot, gpus, threshold=0.7, batch_size=batch_size, epochs=epochs)
+                                     show_plot, gpus, window_length, disable_transformer, threshold=0.7, batch_size=batch_size, epochs=epochs)
     final_evaluation(TP, FP, FN, metric_fn)
     print('previous p is: 0.7.')
     fortestingp = np.arange(0.7, 1, 0.05)
     for p in fortestingp:
         TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset,
                                          False,
-                                         show_plot, gpus, threshold=p, batch_size=batch_size, epochs=epochs)
+                                         show_plot, gpus, window_length, disable_transformer, threshold=p, batch_size=batch_size, epochs=epochs)
         final_evaluation(TP, FP, FN, metric_fn)
         print('previous p is: ' + str(p))
 
@@ -77,9 +79,11 @@ if __name__ == '__main__':
     parser.add_argument('--expression_type', type=str, default='micro-expression') # Specify micro-expression or macro-expression only
     parser.add_argument('--train', type=bool, default=True) #Train or use pre-trained weight for prediction
     parser.add_argument('--show_plot', type=bool, default=True)
-    parser.add_argument('--batch_size', type=int, default=16)
-    parser.add_argument('--epochs', type=int, default=500)
-    parser.add_argument('--gpus', type=str, default=1)
+    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--gpus', type=str, default=0)
+    parser.add_argument('--window_length', type=int, default=512)
+    parser.add_argument('--disable_transformer', type=bool, default=True)
 
     config = parser.parse_args()
     main(config)

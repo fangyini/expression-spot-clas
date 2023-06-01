@@ -41,6 +41,7 @@ class TransformerLightning(pl.LightningModule):
             avg_loss = torch.stack([x['loss'] for x in validation_step_outputs]).mean()
         else:
             avg_loss = validation_step_outputs['loss']
+
         self.log('validation_loss_each_epoch', avg_loss, on_epoch=True, prog_bar=True, sync_dist=True)
 
     def configure_optimizers(self):
@@ -50,16 +51,17 @@ class TransformerLightning(pl.LightningModule):
 
 
 class expressionDataset(Dataset):
-    def __init__(self, x, y, isTrain, src_len=512):
+    def __init__(self, x, y, isTrain, samples_weight, src_len=512):
         self.x = x
         self.y = y
         self.src_len = src_len
         self.isTrain = isTrain
+        self.samples_weight = samples_weight
 
     def __len__(self):
         if self.isTrain:
-            return len(self.x) - self.src_len #todo: testing
-            #return 4
+            #return len(self.x) - self.src_len #todo: testing
+            return 4
         else:
             return int(np.ceil(len(self.x)/self.src_len))
 
@@ -67,19 +69,21 @@ class expressionDataset(Dataset):
         if self.isTrain:
             output_x = np.stack(self.x[idx:(idx+self.src_len)])
             output_y = np.stack(self.y[idx:(idx+self.src_len)])
+            weight = np.stack(self.samples_weight[idx:(idx+self.src_len)])
         else:
             output_x = np.stack(self.x[idx*self.src_len:(idx*self.src_len + self.src_len)])
             output_y = np.stack(self.y[idx*self.src_len:(idx*self.src_len + self.src_len)])
+            weight = np.stack(self.samples_weight[idx*self.src_len:(idx*self.src_len + self.src_len)])
+        return torch.from_numpy(output_x).permute(0, 3, 1, 2).float(), torch.from_numpy(
+            output_y).float(), torch.from_numpy(weight).float()
 
-        return torch.from_numpy(output_x).permute(0,3,1,2).float(), torch.from_numpy(output_y).float()
 
-
-def getDataloader(x, y, isTrain, batch_size):
+def getDataloader(x, y, isTrain, batch_size, window_length, samples_weight):
     if isTrain:
-        dataset = expressionDataset(x, y, True)
+        dataset = expressionDataset(x, y, True, samples_weight, window_length)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     else:
-        dataset = expressionDataset(x, y, False)
+        dataset = expressionDataset(x, y, False, samples_weight, window_length)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     return dataloader
 

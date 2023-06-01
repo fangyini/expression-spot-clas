@@ -7,6 +7,11 @@ from Utils.mean_average_precision.mean_average_precision import MeanAveragePreci
 import pytorch_lightning as pl
 from model.trainer import getDataloader, TransformerLightning, getCallbacks
 import torch
+import os
+from model.train_with_pytorch import train_with_pytorch
+from model.transformer import Multitask_transformer
+from sklearn.utils import class_weight
+
 seed=666
 random.seed(seed)
 np.random.seed(seed)
@@ -116,15 +121,21 @@ def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evalua
     print('TP:', TP, 'FP:', FP, 'FN:', FN)
     return TP, FP, FN
 
+def getSampleWeight(y_train, y_test):
+    class_sample_count = np.unique(y_train, return_counts=True)[1]
+    weight = 1. / class_sample_count
+    samples_weight_train = weight[y_train]
+    samples_weight_test = weight[y_test]
+    return samples_weight_train, samples_weight_test
+
 def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train, show_plot,
-             gpus, threshold, batch_size, epochs):
+             gpus, window_length, disable_transformer, threshold, batch_size, epochs):
     logo = LeaveOneGroupOut()
     logo.get_n_splits(X, y, groupsLabel)
     subject_count = 0
     total_gt = 0
     metric_fn = MeanAveragePrecision2d(num_classes=1)
     p = threshold #From our analysis, 0.55 achieved the highest F1-Score
-    callbacks = getCallbacks()
 
     for train_index, test_index in logo.split(X, y, groupsLabel): # Leave One Subject Out
         subject_count+=1
@@ -136,22 +147,27 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         print('------Initializing the model-------') #To reset the model at every LOSO testing
         
         path = 'Model_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '/'
-        lightningModel = TransformerLightning()
-        trainer = pl.Trainer(limit_train_batches=500, max_epochs=epochs,
-                             default_root_dir=path, callbacks=callbacks, gpus=gpus)
-        test_dataloader = getDataloader(X_test, y_test, False, 1)
+        if os.path.exists(path) == False:
+            os.mkdir(path)
+        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test)
+        test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
+        model = Multitask_transformer(disable_transformer, num_decoder_layers=4, emb_size=576, nhead=4, dim_feedforward=512,
+                                           dropout=0.1).float()
+        model.to(DEVICE)
         if(train):
-            train_loader = getDataloader(X_train, y_train, True, batch_size)
-            trainer.fit(lightningModel, train_loader, test_dataloader)
+            # todo: data agumentation
+            # 1. delete zeros
+            # 2. if (expression_type == 'micro-expression'):
+            #                 X_train, y_train = data_augmentation(X_train, y_train)
+            #                 print('After Augmentation Dataset Labels', Counter(y_train))
+            train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train)
+            train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
 
-        # load best model
-        checkpoint = path + 'lightning_logs/version_0/checkpoints/last.ckpt'
-        lightningModel_best = TransformerLightning.load_from_checkpoint(checkpoint)
-        model = lightningModel_best.model
+        model.load_state_dict(torch.load(path + '/best'))
         model.eval()
 
         result = []
-        for test_x, _ in test_dataloader:
+        for test_x, _, _ in test_dataloader:
             test_x.to(DEVICE)
             output = model(test_x)[0] # 2, 512
             result.extend(output)
@@ -164,8 +180,8 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         TP, FP, FN = evaluation(preds, gt, total_gt, metric_fn)
         
         print('Done Subject', subject_count)
-        del X_train, X_test, y_train, y_test, result, lightningModel, trainer
-        quit()
+        del X_train, X_test, y_train, y_test, result, model
+
     return TP, FP, FN, metric_fn
 
 def final_evaluation(TP, FP, FN, metric_fn):
