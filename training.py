@@ -137,7 +137,10 @@ def delete_label_zero(y_train, ratio, windeoLen):  # list
             zero_label.append(idx)
         else:
             one_label.append(idx)
+
     new_label = random.sample(zero_label, int(len(zero_label) * ratio))
+    print('negative label len: ', len(new_label))
+    print('positive label len: ', len(one_label))
     new_label.extend(one_label)
     return new_label
 
@@ -169,7 +172,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         model.to(DEVICE)
         if(train):
             # todo: data agumentation
-            new_index = delete_label_zero(y_train, 0.5, window_length)
+            new_index = delete_label_zero(y_train, 0.1, window_length)
             random.shuffle(new_index)
             # 1. delete zeros
             # 2. if (expression_type == 'micro-expression'):
