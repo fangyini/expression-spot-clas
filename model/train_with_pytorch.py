@@ -1,6 +1,7 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
+from tqdm import tqdm
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -16,11 +17,11 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
         running_loss = 0.
         last_loss = 0.
 
-        for i, data in enumerate(training_loader):
+        for i, data in tqdm(enumerate(training_loader), total=len(training_loader)):
             inputs, labels, weight = data
-            inputs.to(DEVICE)
-            labels.to(DEVICE)
-            weight.to(DEVICE)
+            inputs = inputs.to(DEVICE)
+            labels = labels.to(DEVICE)
+            weight = weight.to(DEVICE)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = loss_fn(outputs, labels, weight)
@@ -54,11 +55,11 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
         model.eval()
 
         running_vloss = 0.0
-        for i, vdata in enumerate(validation_loader):
+        for i, vdata in tqdm(enumerate(validation_loader), total=len(validation_loader)):
             vinputs, vlabels, vweight = vdata
-            vinputs.to(DEVICE)
-            vlabels.to(DEVICE)
-            vweight.to(DEVICE)
+            vinputs = vinputs.to(DEVICE)
+            vlabels = vlabels.to(DEVICE)
+            vweight = vweight.to(DEVICE)
             voutputs = model(vinputs)
             vloss = loss_fn(voutputs, vlabels, vweight)
             running_vloss += vloss

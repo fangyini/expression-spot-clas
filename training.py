@@ -128,6 +128,19 @@ def getSampleWeight(y_train, y_test):
     samples_weight_test = weight[y_test]
     return samples_weight_train, samples_weight_test
 
+def delete_label_zero(y_train, ratio, windeoLen):  # list
+    length = len(y_train) - windeoLen
+    zero_label = []
+    one_label = []
+    for idx in range(length):
+        if np.sum(y_train[idx:(idx+windeoLen)]) == 0:
+            zero_label.append(idx)
+        else:
+            one_label.append(idx)
+    new_label = random.sample(zero_label, int(len(zero_label) * ratio))
+    new_label.extend(one_label)
+    return new_label
+
 def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train, show_plot,
              gpus, window_length, disable_transformer, threshold, batch_size, epochs):
     logo = LeaveOneGroupOut()
@@ -156,11 +169,14 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         model.to(DEVICE)
         if(train):
             # todo: data agumentation
+            new_index = delete_label_zero(y_train, 0.5, window_length)
+            random.shuffle(new_index)
             # 1. delete zeros
             # 2. if (expression_type == 'micro-expression'):
             #                 X_train, y_train = data_augmentation(X_train, y_train)
             #                 print('After Augmentation Dataset Labels', Counter(y_train))
-            train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train)
+            train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train,
+                                         new_index)
             train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
 
         model.load_state_dict(torch.load(path + '/best'))

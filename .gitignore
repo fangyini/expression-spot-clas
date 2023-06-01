@@ -162,3 +162,4 @@ CASME_sq/
 SAMMLV/
 .DS_Store
 Utils/shape_predictor_68_face_landmarks.dat
+runs/
