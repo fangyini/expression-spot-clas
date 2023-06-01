@@ -31,12 +31,13 @@ class Multitask_transformer(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(decoder_layer, num_layers=num_decoder_layers)
         self.positional_encoding = VisualPositionalEncoding(emb_size, dropout=dropout)
         self.embedding1 = nn.Sequential(nn.Conv2d(1, 3, (3, 3), padding='same'), nn.ReLU(),
-                                        nn.MaxPool2d(5, 5))
+                                        nn.MaxPool2d(6, 6))
         self.embedding2 = nn.Sequential(nn.Conv2d(1, 5, (3, 3), padding='same'), nn.ReLU(),
-                                        nn.MaxPool2d(5, 5))
+                                        nn.MaxPool2d(6, 6))
         self.embedding3 = nn.Sequential(nn.Conv2d(1, 8, (3, 3), padding='same'), nn.ReLU(),
-                                        nn.MaxPool2d(5, 5))
-        self.readout = nn.Linear(emb_size, 1)
+                                        nn.MaxPool2d(6, 6))
+        self.readout = nn.Sequential(nn.Linear(emb_size, 400), nn.ReLU())
+        self.readout2 = nn.Linear(400, 1)
         self.disable_transformer = disable_transformer
 
     def forward(self, input_x): #bs, 512, 3, 30, 30
@@ -49,8 +50,9 @@ class Multitask_transformer(nn.Module):
         x3_embed = self.embedding3(x3.unsqueeze(1)) # bs*512, 400
         x = torch.concatenate([x1_embed, x2_embed, x3_embed], dim=1) #1024, 16, 6, 6
         x = torch.flatten(x, 1, -1).view(bs, src_len, -1) #2, 512, 576
-        if self.disable_transformer:
+        if not self.disable_transformer:
             x = self.positional_encoding(x)
             x = self.transformer_encoder(x) # batch, seq, feature
-        x = self.readout(x).squeeze(-1)
-        return x
+        x = self.readout(x)
+        x = self.readout2(x)
+        return x.squeeze(-1)

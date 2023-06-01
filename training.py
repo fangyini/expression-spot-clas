@@ -170,13 +170,13 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
             os.mkdir(path)
         samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, ratio)
         test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
-        model = Multitask_transformer(disable_transformer, num_decoder_layers=4, emb_size=576, nhead=4, dim_feedforward=512,
+        model = Multitask_transformer(disable_transformer, num_decoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
         model.to(DEVICE)
         if(train):
-            # todo: data agumentation
             new_index = delete_label_zero(y_train, ratio, window_length)
             random.shuffle(new_index)
+            # todo: data agumentation
             # 2. if (expression_type == 'micro-expression'):
             #                 X_train, y_train = data_augmentation(X_train, y_train)
             #                 print('After Augmentation Dataset Labels', Counter(y_train))
