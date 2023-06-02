@@ -20,15 +20,15 @@ class VisualPositionalEncoding(nn.Module):
 class Multitask_transformer(nn.Module):
     def __init__(self,
                  disable_transformer,
-                 num_decoder_layers: int,
+                 num_encoder_layers: int,
                  emb_size: int,
                  nhead: int,
                  dim_feedforward: int,
                  dropout: float):
         super(Multitask_transformer, self).__init__()
-        decoder_layer = nn.TransformerEncoderLayer(d_model=emb_size, nhead=nhead, dim_feedforward=dim_feedforward,
+        encoder_layer = nn.TransformerEncoderLayer(d_model=emb_size, nhead=nhead, dim_feedforward=dim_feedforward,
                                                          dropout=dropout, batch_first=True)
-        self.transformer_encoder = nn.TransformerEncoder(decoder_layer, num_layers=num_decoder_layers)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
         self.positional_encoding = VisualPositionalEncoding(emb_size, dropout=dropout)
         self.embedding1 = nn.Sequential(nn.Conv2d(1, 3, (3, 3), padding='same'), nn.ReLU(),
                                         nn.MaxPool2d(6, 6))
@@ -51,7 +51,7 @@ class Multitask_transformer(nn.Module):
         x = torch.concatenate([x1_embed, x2_embed, x3_embed], dim=1) #1024, 16, 6, 6
         x = torch.flatten(x, 1, -1).view(bs, src_len, -1) #2, 512, 576
         if not self.disable_transformer:
-            x = self.positional_encoding(x)
+            #x = self.positional_encoding(x)
             x = self.transformer_encoder(x) # batch, seq, feature
         x = self.readout(x)
         x = self.readout2(x)

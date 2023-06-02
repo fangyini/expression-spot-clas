@@ -129,7 +129,7 @@ def getSampleWeight(y_train, y_test, ratio):
     samples_weight_test = weight[y_test]
     return samples_weight_train, samples_weight_test
 
-def delete_label_zero(y_train, ratio, windeoLen):  # list
+'''def delete_label_zero(y_train, ratio, windeoLen):  # list
     print('y train size: ', len(y_train))
     print('y train one label size: ', np.sum(y_train))
     length = len(y_train) - windeoLen
@@ -144,10 +144,10 @@ def delete_label_zero(y_train, ratio, windeoLen):  # list
     print('negative label len: ', len(new_label))
     print('positive label len: ', len(one_label))
     new_label.extend(one_label)
-    return new_label
+    return new_label'''
 
 def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train, show_plot,
-             gpus, window_length, disable_transformer, threshold, batch_size, epochs):
+            window_length, disable_transformer, step, threshold, batch_size, epochs):
     logo = LeaveOneGroupOut()
     logo.get_n_splits(X, y, groupsLabel)
     subject_count = 0
@@ -170,18 +170,15 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
             os.mkdir(path)
         samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, ratio)
         test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
-        model = Multitask_transformer(disable_transformer, num_decoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
+        model = Multitask_transformer(disable_transformer, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
         model.to(DEVICE)
         if(train):
-            new_index = delete_label_zero(y_train, ratio, window_length)
-            random.shuffle(new_index)
+            # disable negative label removal
+            #new_index = delete_label_zero(y_train, ratio, window_length)
+            #random.shuffle(new_index)
             # todo: data agumentation
-            # 2. if (expression_type == 'micro-expression'):
-            #                 X_train, y_train = data_augmentation(X_train, y_train)
-            #                 print('After Augmentation Dataset Labels', Counter(y_train))
-            train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train,
-                                         new_index)
+            train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train, step)
             train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
 
         model.load_state_dict(torch.load(path + '/best'))
