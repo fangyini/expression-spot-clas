@@ -120,10 +120,14 @@ def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evalua
     print('TP:', TP, 'FP:', FP, 'FN:', FN)
     return TP, FP, FN
 
-def getSampleWeight(y_train, y_test):
+def getSampleWeight(y_train, y_test, window_length, step):
     print('y train size: ', len(y_train))
     print('y train one label size: ', np.sum(y_train))
-    class_sample_count = np.unique(y_train, return_counts=True)[1]
+    extended_y = []
+    for i in range(0, len(y_train), step):
+        extended_y.extend(y_train[i*step:(i*step+window_length)])
+    class_sample_count = np.unique(extended_y, return_counts=True)[1]
+    print('class count: ', class_sample_count)
     weight = 1. / class_sample_count
     samples_weight_train = weight[y_train]
     samples_weight_test = weight[y_test]
@@ -167,7 +171,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         path = 'Model_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '/'
         if os.path.exists(path) == False:
             os.mkdir(path)
-        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test)
+        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, window_length, step)
         test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
         model = Multitask_transformer(disable_transformer, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
