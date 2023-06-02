@@ -1,14 +1,7 @@
-import os
-
 import torch
-from torch import optim, nn, utils
-import pytorch_lightning as pl
-from .transformer import Multitask_transformer
 from torch.utils.data import Dataset
 import numpy as np
 from torch.utils.data import DataLoader
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 
 class expressionDataset(Dataset):

@@ -4,8 +4,7 @@ import random
 from sklearn.model_selection import LeaveOneGroupOut
 from scipy.signal import find_peaks
 from Utils.mean_average_precision.mean_average_precision import MeanAveragePrecision2d
-import pytorch_lightning as pl
-from model.trainer import getDataloader, TransformerLightning, getCallbacks
+from model.trainer import getDataloader
 import torch
 import os
 from model.train_with_pytorch import train_with_pytorch
