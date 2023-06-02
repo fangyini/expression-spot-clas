@@ -123,10 +123,13 @@ def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evalua
 def getSampleWeight(y_train, y_test, window_length, step):
     print('y train size: ', len(y_train))
     print('y train one label size: ', np.sum(y_train))
-    extended_y = []
-    for i in range(0, len(y_train), step):
-        extended_y.extend(y_train[i*step:(i*step+window_length)])
-    class_sample_count = np.unique(extended_y, return_counts=True)[1]
+    if step > 1:
+        extended_y = []
+        for i in range(0, len(y_train), step):
+            extended_y.extend(y_train[i*step:(i*step+window_length)])
+        class_sample_count = np.unique(extended_y, return_counts=True)[1]
+    else:
+        class_sample_count = np.unique(y_train, return_counts=True)[1]
     print('class count: ', class_sample_count)
     weight = 1. / class_sample_count
     samples_weight_train = weight[y_train]
