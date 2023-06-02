@@ -120,9 +120,10 @@ def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evalua
     print('TP:', TP, 'FP:', FP, 'FN:', FN)
     return TP, FP, FN
 
-def getSampleWeight(y_train, y_test, ratio):
+def getSampleWeight(y_train, y_test):
+    print('y train size: ', len(y_train))
+    print('y train one label size: ', np.sum(y_train))
     class_sample_count = np.unique(y_train, return_counts=True)[1]
-    class_sample_count[0] = int(class_sample_count[0] * ratio)
     weight = 1. / class_sample_count
     samples_weight_train = weight[y_train]
     samples_weight_test = weight[y_test]
@@ -153,7 +154,6 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
     total_gt = 0
     metric_fn = MeanAveragePrecision2d(num_classes=1)
     p = threshold #From our analysis, 0.55 achieved the highest F1-Score
-    ratio = 0.5
 
     for train_index, test_index in logo.split(X, y, groupsLabel): # Leave One Subject Out
         subject_count+=1
@@ -162,12 +162,12 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         X_train, X_test = [X[i] for i in train_index], [X[i] for i in test_index] #Get training set
         y_train, y_test = [y[i] for i in train_index], [y[i] for i in test_index] #Get testing set
         
-        print('------Initializing the model-------') #To reset the model at every LOSO testing
+        print('------Initializing the model-------')
         
         path = 'Model_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '/'
         if os.path.exists(path) == False:
             os.mkdir(path)
-        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, ratio)
+        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test)
         test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
         model = Multitask_transformer(disable_transformer, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
