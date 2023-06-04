@@ -79,12 +79,12 @@ if __name__ == '__main__':
     parser.add_argument('--expression_type', type=str, default='micro-expression') # Specify micro-expression or macro-expression only
     parser.add_argument('--train', type=bool, default=True) #Train or use pre-trained weight for prediction
     parser.add_argument('--show_plot', type=bool, default=True)
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--window_length', type=int, default=12)
+    parser.add_argument('--window_length', type=int, default=128)
     parser.add_argument('--disable_transformer', type=bool, default=False)
-    parser.add_argument('--step', type=int, default=5)
-    # todo: add step, delete unused code, add token, add au,
+    parser.add_argument('--step', type=int, default=64)
+    # todo: add token, add au,
 
     config = parser.parse_args()
     main(config)

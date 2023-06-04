@@ -15,7 +15,7 @@ class expressionDataset(Dataset):
 
     def __len__(self):
         if self.isTrain:
-            return int(len(self.x) / self.step)
+            return int((len(self.x) - self.src_len) / self.step)
             #print('hardcoded size dataloader 4')
             #return 4
         else:
