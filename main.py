@@ -23,6 +23,7 @@ def main(config):
     window_length = config.window_length
     disable_transformer = config.disable_transformer
     step = config.step
+    add_token = config.add_token
     
     print(' ------ Spotting', dataset_name, expression_type, '-------')
 
@@ -57,16 +58,14 @@ def main(config):
     # Model Training & Evaluation
     # X: len, feature; y: len; groupLabel: len;
     print('\n ------ SOFTNet Training & Testing ------')
-    train = True
     TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train,
-                                     show_plot, window_length, disable_transformer, step, threshold=0.7, batch_size=batch_size, epochs=epochs)
+                                     show_plot, window_length, disable_transformer, step, add_token, 0.7, batch_size, epochs)
     final_evaluation(TP, FP, FN, metric_fn)
     print('previous p is: 0.7.')
     fortestingp = np.arange(0.75, 1, 0.05)
     for p in fortestingp:
-        TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset,
-                                         False,
-                                         show_plot, window_length, disable_transformer, step, threshold=p, batch_size=batch_size, epochs=epochs)
+        TP, FP, FN, metric_fn = training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, False,
+                                         show_plot, window_length, disable_transformer, step, add_token, p, batch_size, epochs)
         final_evaluation(TP, FP, FN, metric_fn)
         print('previous p is: ' + str(p))
 
@@ -79,12 +78,14 @@ if __name__ == '__main__':
     parser.add_argument('--expression_type', type=str, default='micro-expression') # Specify micro-expression or macro-expression only
     parser.add_argument('--train', type=bool, default=True) #Train or use pre-trained weight for prediction
     parser.add_argument('--show_plot', type=bool, default=True)
-    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--window_length', type=int, default=128)
+    parser.add_argument('--window_length', type=int, default=12)
     parser.add_argument('--disable_transformer', type=bool, default=False)
-    parser.add_argument('--step', type=int, default=64)
-    # todo: add token, add au,
+    parser.add_argument('--step', type=int, default=5)
+    parser.add_argument('--add_token', type=bool, default=True)
+    parser.add_argument('--add_au', type=bool, default=False)  # NOT IMPLEMENTED
+    # todo: try new positional embedding
 
     config = parser.parse_args()
     main(config)

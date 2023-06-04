@@ -157,7 +157,7 @@ def getSampleWeight(y_train, y_test, window_length, step):
     return new_label'''
 
 def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k, dataset, train, show_plot,
-            window_length, disable_transformer, step, threshold, batch_size, epochs):
+            window_length, disable_transformer, step, add_token, threshold, batch_size, epochs):
     logo = LeaveOneGroupOut()
     logo.get_n_splits(X, y, groupsLabel)
     subject_count = 0
@@ -179,7 +179,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
             os.mkdir(path)
         samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, window_length, step)
         test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
-        model = Multitask_transformer(disable_transformer, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
+        model = Multitask_transformer(disable_transformer, add_token, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
         model.to(DEVICE)
         if(train):

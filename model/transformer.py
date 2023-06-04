@@ -1,6 +1,7 @@
 from torch import Tensor
 import torch
 import torch.nn as nn
+from einops import repeat
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class VisualPositionalEncoding(nn.Module):
@@ -19,7 +20,7 @@ class VisualPositionalEncoding(nn.Module):
 
 class Multitask_transformer(nn.Module):
     def __init__(self,
-                 disable_transformer,
+                 disable_transformer, add_token,
                  num_encoder_layers: int,
                  emb_size: int,
                  nhead: int,
@@ -39,6 +40,10 @@ class Multitask_transformer(nn.Module):
         self.readout = nn.Sequential(nn.Linear(emb_size, 400), nn.ReLU())
         self.readout2 = nn.Linear(400, 1)
         self.disable_transformer = disable_transformer
+        self.add_token = add_token
+        if add_token:
+            self.token = nn.Parameter(torch.randn(1, 1, emb_size))
+        #self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
 
     def forward(self, input_x): #bs, 512, 3, 30, 30
         bs = input_x.size()[0]
@@ -50,9 +55,15 @@ class Multitask_transformer(nn.Module):
         x3_embed = self.embedding3(x3.unsqueeze(1)) # bs*512, 400
         x = torch.concatenate([x1_embed, x2_embed, x3_embed], dim=1) #1024, 16, 6, 6
         x = torch.flatten(x, 1, -1).view(bs, src_len, -1) #2, 512, 576
+        if self.add_token:
+            token = repeat(self.token, '1 1 d -> b 1 d', b=x.size()[0])
+            x = torch.cat((token, x), dim=1)
         if not self.disable_transformer:
             #x = self.positional_encoding(x)
+            #x += self.pos_embedding[:, :(n + 1)]
             x = self.transformer_encoder(x) # batch, seq, feature
+        if self.add_token:
+            x = x[:, 1:, :]
         x = self.readout(x)
         x = self.readout2(x)
         return x.squeeze(-1)
