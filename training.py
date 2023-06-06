@@ -182,21 +182,22 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         model = Multitask_transformer(disable_transformer, add_token, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
         model.to(DEVICE)
-        if(train):
+        if train:
             # disable negative label removal
             #new_index = delete_label_zero(y_train, ratio, window_length)
             #random.shuffle(new_index)
-            # todo: data agumentation
+            # no data agumentation
             train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train, step)
-            train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
-
-        model.load_state_dict(torch.load(path + '/best'))
-        model.eval()
+            best_model = train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
+        else:
+            model.load_state_dict(torch.load(path + '/best'))
+            model.eval()
+            best_model = model
 
         result = []
         for test_x, _, _ in test_dataloader:
             test_x = test_x.to(DEVICE)
-            output = model(test_x)[0] # 2, 512
+            output = best_model(test_x)[0] # 2, 512
             result.extend(output)
         result = torch.stack(result).unsqueeze(1)
         result = result.cpu().detach().numpy()
