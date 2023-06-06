@@ -38,10 +38,10 @@ class expressionDataset(Dataset):
 def getDataloader(x, y, isTrain, batch_size, window_length, samples_weight, step=None):
     if isTrain:
         dataset = expressionDataset(x, y, True, samples_weight, window_length, step)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     else:
         dataset = expressionDataset(x, y, False, samples_weight, window_length, step)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
     return dataloader
 
 

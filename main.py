@@ -80,9 +80,9 @@ if __name__ == '__main__':
     parser.add_argument('--show_plot', type=bool, default=True)
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--window_length', type=int, default=12)
+    parser.add_argument('--window_length', type=int, default=128)
     parser.add_argument('--disable_transformer', type=bool, default=False)
-    parser.add_argument('--step', type=int, default=5)
+    parser.add_argument('--step', type=int, default=64)
     parser.add_argument('--add_token', type=bool, default=True)
     parser.add_argument('--add_au', type=bool, default=False)  # NOT IMPLEMENTED
     # todo: try new positional embedding

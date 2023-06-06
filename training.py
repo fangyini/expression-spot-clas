@@ -14,7 +14,9 @@ from sklearn.utils import class_weight
 seed=666
 random.seed(seed)
 np.random.seed(seed)
+torch.manual_seed(seed)
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.use_deterministic_algorithms(True)
 
 def pseudo_labeling(final_images, final_samples, k):
     pseudo_y = []
@@ -182,22 +184,21 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         model = Multitask_transformer(disable_transformer, add_token, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
         model.to(DEVICE)
-        if train:
+        if(train):
             # disable negative label removal
             #new_index = delete_label_zero(y_train, ratio, window_length)
             #random.shuffle(new_index)
-            # no data agumentation
+            # todo: data agumentation
             train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train, step)
-            best_model = train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
-        else:
-            model.load_state_dict(torch.load(path + '/best'))
-            model.eval()
-            best_model = model
+            train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
+
+        model.load_state_dict(torch.load(path + '/best'))
+        model.eval()
 
         result = []
         for test_x, _, _ in test_dataloader:
             test_x = test_x.to(DEVICE)
-            output = best_model(test_x)[0] # 2, 512
+            output = model(test_x)[0] # 2, 512
             result.extend(output)
         result = torch.stack(result).unsqueeze(1)
         result = result.cpu().detach().numpy()

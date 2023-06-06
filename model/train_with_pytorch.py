@@ -78,11 +78,10 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
             #model_path = 'model_{}_{}'.format(timestamp, epoch_number)
             torch.save(model.state_dict(), path+'/best')
             havent_change = 0
-            best_model = model
         else:
             havent_change += 1
 
         if havent_change > total_havent_change:
-            return best_model
+            return 0
 
         epoch_number += 1
