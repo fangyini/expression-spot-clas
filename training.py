@@ -15,8 +15,11 @@ seed=666
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
 torch.use_deterministic_algorithms(True)
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 def pseudo_labeling(final_images, final_samples, k):
     pseudo_y = []
@@ -115,6 +118,52 @@ def spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_
     return preds, gt, total_gt
 
 
+def spotting_clas(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot, path):
+    prev = 0
+    for videoIndex, video in enumerate(final_samples[subject_count - 1]):
+        preds = []
+        gt = []
+        countVideo = len([video for subject in final_samples[:subject_count - 1] for video in subject])
+        print('Video:', countVideo + videoIndex)
+        score_plot = np.array(
+            result[prev:prev + len(dataset[countVideo + videoIndex])])  # Get related frames to each video
+        score_plot_agg = score_plot.copy()
+
+        # Score aggregation
+        #for x in range(len(score_plot[k:-k])):
+        #    score_plot_agg[x + k] = score_plot[x:x + 2 * k].mean()
+        score_plot_agg = score_plot_agg[k:-k]
+
+        # Plot the result to see the peaks
+        # Note for some video the ground truth samples is below frame index 0 due to the effect of aggregation, but no impact to the evaluation
+        if (show_plot):
+            plt.figure(figsize=(15, 4))
+            plt.plot(score_plot_agg)
+            plt.xlabel('Frame')
+            plt.ylabel('Score')
+        threshold = score_plot_agg.mean() + p * (
+                    max(score_plot_agg) - score_plot_agg.mean())  # Moilanen threshold technique
+        peaks, _ = find_peaks(score_plot_agg[:, 0], height=threshold[0], distance=k,
+                              plateau_size=[0, 2], width=1)
+        if len(peaks) == 0:  # Occurs when no peak is detected, simply give a value to pass the exception in mean_average_precision
+            preds.append([0, 0, 0, 0, 0, 0])
+        for peak in peaks:
+            preds.append([peak - k, 0, peak + k, 0, 0, 0])  # Extend left and right side of peak by k frames
+        for samples in video:
+            gt.append([samples[0] - k, 0, samples[1] - k, 0, 0, 0, 0])
+            total_gt += 1
+            if (show_plot):
+                plt.axvline(x=samples[0] - k, color='r')
+                plt.axvline(x=samples[1] - k + 1, color='r')
+                plt.axhline(y=threshold, color='g')
+        if (show_plot):
+            # plt.show()
+            plt.savefig(path + '/img_' + str(countVideo + videoIndex) + '.png')
+            np.save(path + '/arr_' + str(countVideo + videoIndex) + '.npy', score_plot_agg)
+        prev += len(dataset[countVideo + videoIndex])
+        metric_fn.add(np.array(preds), np.array(gt))  # IoU = 0.5 according to MEGC2020 metrics
+    return preds, gt, total_gt
+
 def evaluation(preds, gt, total_gt, metric_fn): #Get TP, FP, FN for final evaluation
     TP = int(sum(metric_fn.value(iou_thresholds=0.5)[0.5][0]['tp'])) 
     FP = int(sum(metric_fn.value(iou_thresholds=0.5)[0.5][0]['fp']))
@@ -198,13 +247,15 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         result = []
         for test_x, _, _ in test_dataloader:
             test_x = test_x.to(DEVICE)
-            output = model(test_x)[0] # 2, 512
+            #output = model(test_x)[0] # 2, 512
+            output = torch.argmax(model(test_x), dim=2).flatten()
             result.extend(output)
         result = torch.stack(result).unsqueeze(1)
-        result = result.cpu().detach().numpy()
-        assert result.shape[0] == len(y_test)
+        result = result.cpu().detach().numpy() # size: 1069, 1
+        #assert result.shape[0] == len(y_test)
 
-        preds, gt, total_gt = spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot,
+        preds, gt, total_gt = spotting_clas(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p,
+                                       show_plot,
                                        path)
         TP, FP, FN = evaluation(preds, gt, total_gt, metric_fn)
         

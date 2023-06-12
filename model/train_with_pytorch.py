@@ -8,9 +8,15 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def weighted_mse_loss(input, target, weight):
     return torch.sum(weight * (input - target) ** 2)
 
+def weighted_bce_loss(input, target, weight):
+    input_class_zero = input[:, :, 0]
+    bce = -(target * torch.log(input_class_zero) + (1 - target) * torch.log(1 - input_class_zero))
+    bce = bce * weight
+    return torch.sum(bce)
+
 
 def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
-    loss_fn = weighted_mse_loss
+    loss_fn = weighted_bce_loss
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     def train_one_epoch(epoch_index, tb_writer=None):
