@@ -14,10 +14,10 @@ from sklearn.utils import class_weight
 seed=666
 random.seed(seed)
 np.random.seed(seed)
-torch.manual_seed(seed)
+'''torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
-torch.use_deterministic_algorithms(True)
+torch.use_deterministic_algorithms(True)'''
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -247,16 +247,15 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         result = []
         for test_x, _, _ in test_dataloader:
             test_x = test_x.to(DEVICE)
-            #output = model(test_x)[0] # 2, 512
-            output = torch.argmax(model(test_x), dim=2).flatten()
+            output = model(test_x)[0] # 2, 512
+            #output = torch.argmax(model(test_x), dim=2).flatten()
             result.extend(output)
         result = torch.stack(result).unsqueeze(1)
         result = result.cpu().detach().numpy() # size: 1069, 1
         #assert result.shape[0] == len(y_test)
 
-        preds, gt, total_gt = spotting_clas(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p,
-                                       show_plot,
-                                       path)
+        preds, gt, total_gt = spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p,
+                                       show_plot, path)
         TP, FP, FN = evaluation(preds, gt, total_gt, metric_fn)
         
         print('Done Subject', subject_count)
@@ -274,34 +273,3 @@ def final_evaluation(TP, FP, FN, metric_fn):
     print('Recall = ', round(recall, 4))
     print('F1-Score = ', round(F1_score, 4))
     print("COCO AP@[.5:.95]:", round(metric_fn.value(iou_thresholds=np.round(np.arange(0.5, 1.0, 0.05), 2), mpolicy='soft')['mAP'], 4))
-    
-    
-# Result if Pre-trained weights are used, slightly different to the research paper
-
-# Final Result for CASME_sq micro-expression
-# TP: 18 FP: 327 FN: 39
-# Precision =  0.0522
-# Recall =  0.3158
-# F1-Score =  0.0896
-# COCO AP@[.5:.95]: 0.0069
-
-# Final Result for CASME_sq macro-expression
-# TP: 91 FP: 348 FN: 209
-# Precision =  0.2073
-# Recall =  0.3033
-# F1-Score =  0.2463
-# COCO AP@[.5:.95]: 0.0175
-
-# Final Result for SAMMLV micro-expression
-# TP: 41 FP: 323 FN: 118
-# Precision =  0.1126
-# Recall =  0.2579
-# F1-Score =  0.1568
-# COCO AP@[.5:.95]: 0.0092
-
-# Final Result for SAMMLV macro-expression
-# TP: 60 FP: 231 FN: 273
-# Precision =  0.2062
-# Recall =  0.1802
-# F1-Score =  0.1923
-# COCO AP@[.5:.95]: 0.0103

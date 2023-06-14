@@ -38,13 +38,13 @@ class Multitask_transformer(nn.Module):
         self.embedding3 = nn.Sequential(nn.Conv2d(1, 8, (3, 3), padding='same'), nn.ReLU(),
                                         nn.MaxPool2d(6, 6))
         self.readout = nn.Sequential(nn.Linear(emb_size, 400), nn.ReLU())
-        self.readout2 = nn.Linear(400, 2)
+        self.readout2 = nn.Linear(400, 1)
         self.disable_transformer = disable_transformer
         self.add_token = add_token
         if add_token:
             self.token = nn.Parameter(torch.randn(1, 1, emb_size))
         #self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
-        self.sigmoid = nn.Sigmoid()
+        #self.sigmoid = nn.Sigmoid()
 
     def forward(self, input_x): #bs, 512, 3, 30, 30
         bs = input_x.size()[0]
@@ -67,5 +67,5 @@ class Multitask_transformer(nn.Module):
             x = x[:, 1:, :]
         x = self.readout(x)
         x = self.readout2(x)
-        x = self.sigmoid(x)
-        return x #.squeeze(-1)
+        #x = self.sigmoid(x)
+        return x.squeeze(-1)

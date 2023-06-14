@@ -16,7 +16,7 @@ def weighted_bce_loss(input, target, weight):
 
 
 def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
-    loss_fn = weighted_bce_loss
+    loss_fn = weighted_mse_loss
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     def train_one_epoch(epoch_index, tb_writer=None):
