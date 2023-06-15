@@ -14,9 +14,22 @@ def weighted_bce_loss(input, target, weight):
     bce = bce * weight
     return torch.sum(bce)
 
+def object_detection_loss(input, target, weight, mseLoss):
+    # todo: lambda, iou
+    b = target.size()[0]
+    loss = 0
+    for i in range(b):
+        gt_object = target[i][0]
+        if gt_object == 0:
+            loss += (mseLoss(target[i][0], input[i][0]) * weight[0])
+        else:
+            loss += (mseLoss(target[i], input[i]) * weight[1])
+    loss /= b
+    return loss
 
-def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
+def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS, class_weight):
     loss_fn = weighted_mse_loss
+    mse_loss = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     def train_one_epoch(epoch_index, tb_writer=None):
@@ -24,13 +37,22 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
         last_loss = 0.
 
         for i, data in tqdm(enumerate(training_loader), total=len(training_loader)):
-            inputs, labels, weight = data
+            '''inputs, labels, weight = data
             inputs = inputs.to(DEVICE)
             labels = labels.to(DEVICE)
             weight = weight.to(DEVICE)
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = loss_fn(outputs, labels, weight)
+            loss = loss_fn(outputs, labels, weight)'''
+
+            # changed to OB
+            inputs, labels = data
+            inputs = inputs.to(DEVICE)
+            labels = labels.to(DEVICE)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = object_detection_loss(outputs, labels, class_weight, mse_loss)
+
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -62,12 +84,20 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS):
 
         running_vloss = 0.0
         for i, vdata in tqdm(enumerate(validation_loader), total=len(validation_loader)):
-            vinputs, vlabels, vweight = vdata
+            '''vinputs, vlabels, vweight = vdata
             vinputs = vinputs.to(DEVICE)
             vlabels = vlabels.to(DEVICE)
             vweight = vweight.to(DEVICE)
             voutputs = model(vinputs)
-            vloss = loss_fn(voutputs, vlabels, vweight)
+            vloss = loss_fn(voutputs, vlabels, vweight)'''
+
+            # changed to OB
+            inputs, labels = vdata
+            inputs = inputs.to(DEVICE)
+            labels = labels.to(DEVICE)
+            outputs = model(inputs)
+            vloss = object_detection_loss(outputs, labels, class_weight, mse_loss)
+
             running_vloss += vloss
 
         avg_vloss = running_vloss / (i + 1)

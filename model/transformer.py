@@ -20,7 +20,7 @@ class VisualPositionalEncoding(nn.Module):
 
 class Multitask_transformer(nn.Module):
     def __init__(self,
-                 disable_transformer, add_token,
+                 disable_transformer, add_token, window_length,
                  num_encoder_layers: int,
                  emb_size: int,
                  nhead: int,
@@ -46,6 +46,9 @@ class Multitask_transformer(nn.Module):
         #self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         #self.sigmoid = nn.Sigmoid()
 
+        self.conv1d = nn.Conv1d(window_length, 1, 3, padding='same')
+        self.readout3 = nn.Linear(400, 3)
+
     def forward(self, input_x): #bs, 512, 3, 30, 30
         bs = input_x.size()[0]
         src_len = input_x.size()[1]
@@ -65,7 +68,12 @@ class Multitask_transformer(nn.Module):
             x = self.transformer_encoder(x) # batch, seq, feature
         if self.add_token:
             x = x[:, 1:, :]
-        x = self.readout(x)
+        '''x = self.readout(x)
         x = self.readout2(x)
         #x = self.sigmoid(x)
-        return x.squeeze(-1)
+        return x.squeeze(-1)'''
+
+        # changed to OB:
+        x = self.conv1d(x) # 2, 1, 400
+        x = self.readout3(x)
+        return x.squeeze(1)

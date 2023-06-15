@@ -32,14 +32,20 @@ def pseudo_labeling(final_images, final_samples, k):
                 pseudo_y.append([0 for i in range(len(final_images[video_count])-k)]) #Last k frames are ignored
             else:
                 pseudo_y_each = [0]*(len(final_images[video_count])-k)
-                for ME in video:
+                '''for ME in video:
                     samples_arr.append(np.arange(ME[0]+1, ME[1]+1))
                 for ground_truth_arr in samples_arr: 
                     for index in range(len(pseudo_y_each)):
                         pseudo_arr = np.arange(index, index+k) 
                         # Equivalent to if IoU>0 then y=1, else y=0
                         if (pseudo_y_each[index] < len(np.intersect1d(pseudo_arr, ground_truth_arr))/len(np.union1d(pseudo_arr, ground_truth_arr))):
-                            pseudo_y_each[index] = 1 
+                            pseudo_y_each[index] = 1 '''
+                # changed to OB
+                for ME in video:
+                    samples_arr.append([int((ME[0] + 1 + ME[1] + 1) / 2), ME[1] - ME[0]])
+                for [index, length] in samples_arr:
+                    pseudo_y_each[index] = length
+
                 pseudo_y.append(pseudo_y_each)
             video_count+=1
     
@@ -118,7 +124,7 @@ def spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_
     return preds, gt, total_gt
 
 
-def spotting_clas(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot, path):
+def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot, path):
     prev = 0
     for videoIndex, video in enumerate(final_samples[subject_count - 1]):
         preds = []
@@ -127,39 +133,30 @@ def spotting_clas(result, total_gt, final_samples, subject_count, dataset, k, me
         print('Video:', countVideo + videoIndex)
         score_plot = np.array(
             result[prev:prev + len(dataset[countVideo + videoIndex])])  # Get related frames to each video
-        score_plot_agg = score_plot.copy()
 
-        # Score aggregation
-        #for x in range(len(score_plot[k:-k])):
-        #    score_plot_agg[x + k] = score_plot[x:x + 2 * k].mean()
-        score_plot_agg = score_plot_agg[k:-k]
+        peaks = np.where(score_plot > 0)[0]
 
-        # Plot the result to see the peaks
-        # Note for some video the ground truth samples is below frame index 0 due to the effect of aggregation, but no impact to the evaluation
         if (show_plot):
             plt.figure(figsize=(15, 4))
-            plt.plot(score_plot_agg)
+            plt.plot(np.arange(0, result.shape[0], 12), confidence_score) # todo: winlen
             plt.xlabel('Frame')
             plt.ylabel('Score')
-        threshold = score_plot_agg.mean() + p * (
-                    max(score_plot_agg) - score_plot_agg.mean())  # Moilanen threshold technique
-        peaks, _ = find_peaks(score_plot_agg[:, 0], height=threshold[0], distance=k,
-                              plateau_size=[0, 2], width=1)
+
         if len(peaks) == 0:  # Occurs when no peak is detected, simply give a value to pass the exception in mean_average_precision
             preds.append([0, 0, 0, 0, 0, 0])
         for peak in peaks:
-            preds.append([peak - k, 0, peak + k, 0, 0, 0])  # Extend left and right side of peak by k frames
+            preds.append([peak - 2*k, 0, peak + 2*k, 0, 0, 0])  # Extend left and right side of peak by k frames
         for samples in video:
             gt.append([samples[0] - k, 0, samples[1] - k, 0, 0, 0, 0])
             total_gt += 1
             if (show_plot):
                 plt.axvline(x=samples[0] - k, color='r')
                 plt.axvline(x=samples[1] - k + 1, color='r')
-                plt.axhline(y=threshold, color='g')
+                #plt.axhline(y=threshold, color='g')
         if (show_plot):
             # plt.show()
             plt.savefig(path + '/img_' + str(countVideo + videoIndex) + '.png')
-            np.save(path + '/arr_' + str(countVideo + videoIndex) + '.npy', score_plot_agg)
+            np.save(path + '/arr_' + str(countVideo + videoIndex) + '.npy', confidence_score)
         prev += len(dataset[countVideo + videoIndex])
         metric_fn.add(np.array(preds), np.array(gt))  # IoU = 0.5 according to MEGC2020 metrics
     return preds, gt, total_gt
@@ -176,19 +173,33 @@ def getSampleWeight(y_train, y_test, window_length, step):
     print('y train one label size: ', np.sum(y_train))
     print('y test size: ', len(y_test))
     print('y test one label size: ', np.sum(y_test))
-    if step > 1:
+
+    '''if step > 1:
         extended_y = []
         for i in range(0, len(y_train), step):
             segment = y_train[i:(i+window_length)]
             extended_y.extend(segment)
         class_sample_count = np.unique(extended_y, return_counts=True)[1]
     else:
-        class_sample_count = np.unique(y_train, return_counts=True)[1]
+        class_sample_count = np.unique(y_train, return_counts=True)[1]'''
+    # changed to OB
+    extended_y = []
+    for i in range(0, len(y_train), step):
+        segment = np.sum(y_train[i:(i + window_length)])
+        if segment > 0:
+            segment = 1
+        extended_y.append(segment)
+    class_sample_count = np.unique(extended_y, return_counts=True)[1]
+
     print('class count: ', class_sample_count)
     weight = 1. / class_sample_count
-    samples_weight_train = weight[y_train]
+    '''samples_weight_train = weight[y_train]
     samples_weight_test = weight[y_test]
     return samples_weight_train, samples_weight_test
+    '''
+    # changed to OB
+    return weight
+
 
 '''def delete_label_zero(y_train, ratio, windeoLen):  # list
     print('y train size: ', len(y_train))
@@ -228,9 +239,14 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         path = 'Model_Weights/' + dataset_name + '/' + expression_type + '/s' + str(subject_count) + '/'
         if os.path.exists(path) == False:
             os.mkdir(path)
-        samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, window_length, step)
-        test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)
-        model = Multitask_transformer(disable_transformer, add_token, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
+        '''samples_weight_train, samples_weight_test = getSampleWeight(y_train, y_test, window_length, step)
+        test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, samples_weight_test)'''
+
+        # change to OB
+        class_weight = getSampleWeight(y_train, y_test, window_length, step)
+        test_dataloader = getDataloader(X_test, y_test, False, 1, window_length, class_weight, 2*k)
+
+        model = Multitask_transformer(disable_transformer, add_token, window_length, num_encoder_layers=4, emb_size=400, nhead=4, dim_feedforward=512,
                                            dropout=0.1).float()
         model.to(DEVICE)
         if(train):
@@ -238,23 +254,43 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
             #new_index = delete_label_zero(y_train, ratio, window_length)
             #random.shuffle(new_index)
             # todo: data agumentation
-            train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train, step)
-            train_with_pytorch(model, train_loader, test_dataloader, path, epochs)
+
+            #train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, samples_weight_train, step)
+            # changed to OB:
+            train_loader = getDataloader(X_train, y_train, True, batch_size, window_length, class_weight, 2*k, step)
+            train_with_pytorch(model, train_loader, test_dataloader, path, epochs, class_weight)
 
         model.load_state_dict(torch.load(path + '/best'))
         model.eval()
 
         result = []
-        for test_x, _, _ in test_dataloader:
+        '''for test_x, _, _ in test_dataloader:
             test_x = test_x.to(DEVICE)
             output = model(test_x)[0] # 2, 512
             #output = torch.argmax(model(test_x), dim=2).flatten()
             result.extend(output)
+        result = torch.stack(result).unsqueeze(1)'''
+
+        # changed to OB:
+        confidence_score = []
+        for test_x, _ in test_dataloader:
+            test_x = test_x.to(DEVICE)
+            output = model(test_x)[0]
+            res = torch.zeros(window_length).to(DEVICE)
+            confidence_score.append(output[0])
+            if output[0] > p:
+                ind = torch.round(output[1] * window_length).int()
+                length = torch.round(output[2] * 2 * k)
+                res[ind] = length
+            result.extend(res)
         result = torch.stack(result).unsqueeze(1)
+        confidence_score = torch.stack(confidence_score).unsqueeze(1)
+
         result = result.cpu().detach().numpy() # size: 1069, 1
+        confidence_score = confidence_score.cpu().detach().numpy()
         #assert result.shape[0] == len(y_test)
 
-        preds, gt, total_gt = spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p,
+        preds, gt, total_gt = spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p,
                                        show_plot, path)
         TP, FP, FN = evaluation(preds, gt, total_gt, metric_fn)
         
