@@ -53,7 +53,7 @@ class expressionDataset(Dataset):
         else:
             center_list = np.where(output_y > 0)[0]
             if len(center_list) > 1:
-                center = random.sample(list(center_list), 1)
+                center = random.sample(list(center_list), 1)[0]
             else:
                 center = center_list[0]
             length = output_y[center]
