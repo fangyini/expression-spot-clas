@@ -124,8 +124,10 @@ def spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_
     return preds, gt, total_gt
 
 
-def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p, show_plot, path):
+def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn, show_plot,
+                path, winLen):
     prev = 0
+    # todo: add smooth?
     for videoIndex, video in enumerate(final_samples[subject_count - 1]):
         preds = []
         gt = []
@@ -133,27 +135,30 @@ def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count
         print('Video:', countVideo + videoIndex)
         score_plot = np.array(
             result[prev:prev + len(dataset[countVideo + videoIndex])])  # Get related frames to each video
-
+        confidence_score_video = confidence_score[int(prev/winLen) :int(prev + len(dataset[countVideo + videoIndex])/winLen)]
         peaks = np.where(score_plot > 0)[0]
 
-        if (show_plot):
+        if show_plot:
             plt.figure(figsize=(15, 4))
-            plt.plot(np.arange(0, result.shape[0], 12), confidence_score) # todo: winlen
+            plt.plot(np.arange(0, result.shape[0], winLen), confidence_score_video) # todo: winlen
             plt.xlabel('Frame')
             plt.ylabel('Score')
 
         if len(peaks) == 0:  # Occurs when no peak is detected, simply give a value to pass the exception in mean_average_precision
             preds.append([0, 0, 0, 0, 0, 0])
         for peak in peaks:
-            preds.append([peak - 2*k, 0, peak + 2*k, 0, 0, 0])  # Extend left and right side of peak by k frames
+            preds.append([peak, 0, peak + 2 * k, 0, 0, 0])  # Extend left and right side of peak by k frames
+            if show_plot:
+                plt.axvline(x=peak, color='g')
+                plt.axvline(x=peak + 2 * k, color='g')
         for samples in video:
-            gt.append([samples[0] - k, 0, samples[1] - k, 0, 0, 0, 0])
+            gt.append([samples[0], 0, samples[1], 0, 0, 0, 0])
             total_gt += 1
-            if (show_plot):
-                plt.axvline(x=samples[0] - k, color='r')
-                plt.axvline(x=samples[1] - k + 1, color='r')
+            if show_plot:
+                plt.axvline(x=samples[0], color='r')
+                plt.axvline(x=samples[1] + 1, color='r')
                 #plt.axhline(y=threshold, color='g')
-        if (show_plot):
+        if show_plot:
             # plt.show()
             plt.savefig(path + '/img_' + str(countVideo + videoIndex) + '.png')
             np.save(path + '/arr_' + str(countVideo + videoIndex) + '.npy', confidence_score)
@@ -290,8 +295,8 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         confidence_score = confidence_score.cpu().detach().numpy()
         #assert result.shape[0] == len(y_test)
 
-        preds, gt, total_gt = spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn, p,
-                                       show_plot, path)
+        preds, gt, total_gt = spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn,
+                                       show_plot, path, window_length)
         TP, FP, FN = evaluation(preds, gt, total_gt, metric_fn)
         
         print('Done Subject', subject_count)

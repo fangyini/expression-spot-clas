@@ -41,7 +41,7 @@ def main(config):
     print('\n ------ Computing k ------')
     #k = cal_k(dataset_name, expression_type, final_samples)
     k = 6
-    print('hardcoded k = 6')
+    print('hardcoded k = 6 for CASME2 micro')
     
     # Feature Extraction & Pre-processing
     print('\n ------ Feature Extraction & Pre-processing ------')
@@ -78,14 +78,15 @@ if __name__ == '__main__':
     parser.add_argument('--expression_type', type=str, default='micro-expression') # Specify micro-expression or macro-expression only
     parser.add_argument('--train', type=bool, default=True) #Train or use pre-trained weight for prediction
     parser.add_argument('--show_plot', type=bool, default=True)
-    parser.add_argument('--batch_size', type=int, default=2)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--window_length', type=int, default=12)
     parser.add_argument('--disable_transformer', type=bool, default=True)
     parser.add_argument('--step', type=int, default=6)
     parser.add_argument('--add_token', type=bool, default=False)
     parser.add_argument('--add_au', type=bool, default=False)  # NOT IMPLEMENTED
     # todo: try new positional embedding
+    # todo: NMS postprocessing
 
     config = parser.parse_args()
     main(config)

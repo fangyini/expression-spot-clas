@@ -23,7 +23,7 @@ def object_detection_loss(input, target, weight, mseLoss):
         if gt_object == 0:
             loss += (mseLoss(target[i][0], input[i][0]) * weight[0])
         else:
-            loss += (mseLoss(target[i], input[i]) * weight[1])
+            loss += (mseLoss(target[i][0], input[i][0]) * weight[1])  # todo: only use confidence score
     loss /= b
     return loss
 
