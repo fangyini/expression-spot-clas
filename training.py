@@ -125,7 +125,7 @@ def spotting(result, total_gt, final_samples, subject_count, dataset, k, metric_
 
 
 def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn, show_plot,
-                path, winLen):
+                path, winLen, p):
     prev = 0
     # todo: add smooth?
     for videoIndex, video in enumerate(final_samples[subject_count - 1]):
@@ -136,11 +136,16 @@ def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count
         score_plot = np.array(
             result[prev:prev + len(dataset[countVideo + videoIndex])])  # Get related frames to each video
         confidence_score_video = confidence_score[int(prev/winLen) :int(prev + len(dataset[countVideo + videoIndex])/winLen)]
-        peaks = np.where(score_plot > 0)[0]
+        # peaks = np.where(score_plot > 0)[0]
+
+        # todo: only test confidence score
+        threshold = confidence_score_video.mean() + p * (max(confidence_score_video) - confidence_score_video.mean())
+        pre_peaks = np.where(confidence_score_video > threshold)[0]
+        peaks = [x*winLen for x in pre_peaks]
 
         if show_plot:
             plt.figure(figsize=(15, 4))
-            plt.plot(np.arange(0, result.shape[0], winLen), confidence_score_video) # todo: winlen
+            plt.plot(np.arange(0, score_plot.shape[0], winLen)[:confidence_score_video.shape[0]], confidence_score_video)
             plt.xlabel('Frame')
             plt.ylabel('Score')
 
@@ -157,7 +162,7 @@ def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count
             if show_plot:
                 plt.axvline(x=samples[0], color='r')
                 plt.axvline(x=samples[1] + 1, color='r')
-                #plt.axhline(y=threshold, color='g')
+                plt.axhline(y=threshold, color='b')
         if show_plot:
             # plt.show()
             plt.savefig(path + '/img_' + str(countVideo + videoIndex) + '.png')
@@ -277,16 +282,19 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         result = torch.stack(result).unsqueeze(1)'''
 
         # changed to OB:
+        print('hardcode index to the middle')
         confidence_score = []
         for test_x, _ in test_dataloader:
             test_x = test_x.to(DEVICE)
             output = model(test_x)[0]
             res = torch.zeros(window_length).to(DEVICE)
             confidence_score.append(output[0])
-            if output[0] > p:
-                ind = torch.round(output[1] * window_length).int()
+            # todo: only use confidence score
+            '''if output[0] > p:
+                #ind = torch.round(output[1] * window_length).int()
+                ind = int(window_length/2)
                 length = torch.round(output[2] * 2 * k)
-                res[ind] = length
+                res[ind] = length'''
             result.extend(res)
         result = torch.stack(result).unsqueeze(1)
         confidence_score = torch.stack(confidence_score).unsqueeze(1)
@@ -296,7 +304,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         #assert result.shape[0] == len(y_test)
 
         preds, gt, total_gt = spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn,
-                                       show_plot, path, window_length)
+                                       show_plot, path, window_length, p)
         TP, FP, FN = evaluation(preds, gt, total_gt, metric_fn)
         
         print('Done Subject', subject_count)

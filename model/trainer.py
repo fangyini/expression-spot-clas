@@ -15,6 +15,7 @@ class expressionDataset(Dataset):
         self.samples_weight = samples_weight
         self.step = step
         self.expression_len = expression_len
+        print('change dataset: only use iou=1 window!')
 
     def __len__(self):
         if self.isTrain:
@@ -51,13 +52,24 @@ class expressionDataset(Dataset):
         if output_y.sum() == 0:
             label = [0, 0, 0]
         else:
-            center_list = np.where(output_y > 0)[0]
+            '''center_list = np.where(output_y > 0)[0]
             if len(center_list) > 1:
                 center = random.sample(list(center_list), 1)[0]
             else:
                 center = center_list[0]
             length = output_y[center]
-            label = [1, center / self.src_len, length / self.expression_len]
+            label = [1, center / self.src_len, length / self.expression_len]'''
+            # todo: changed to only use iou=1
+            center_list = np.where(output_y > 0)[0]
+            isOne = False
+            for c in center_list:
+                if c / self.src_len >= 0.4 and c / self.src_len <= 0.6:
+                    isOne = True
+                    break
+            if isOne:
+                label = [1, 0.5, 1]
+            else:
+                label = [0, 0, 0]
         label = torch.tensor(label).float()
         return torch.from_numpy(output_x).permute(0, 3, 1, 2).float(), label
 

@@ -79,14 +79,14 @@ if __name__ == '__main__':
     parser.add_argument('--train', type=bool, default=True) #Train or use pre-trained weight for prediction
     parser.add_argument('--show_plot', type=bool, default=True)
     parser.add_argument('--batch_size', type=int, default=4)
-    parser.add_argument('--epochs', type=int, default=300)
+    parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--window_length', type=int, default=12)
     parser.add_argument('--disable_transformer', type=bool, default=True)
     parser.add_argument('--step', type=int, default=6)
     parser.add_argument('--add_token', type=bool, default=False)
     parser.add_argument('--add_au', type=bool, default=False)  # NOT IMPLEMENTED
     # todo: try new positional embedding
-    # todo: NMS postprocessing
+    # todo: NMS postprocessing + step 6
 
     config = parser.parse_args()
     main(config)
