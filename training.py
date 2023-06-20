@@ -135,7 +135,7 @@ def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count
         print('Video:', countVideo + videoIndex)
         score_plot = np.array(
             result[prev:prev + len(dataset[countVideo + videoIndex])])  # Get related frames to each video
-        confidence_score_video = confidence_score[int(prev/winLen) :int(prev + len(dataset[countVideo + videoIndex])/winLen)]
+        confidence_score_video = confidence_score[int(prev/winLen) :int((prev + len(dataset[countVideo + videoIndex]))/winLen)]
         # peaks = np.where(score_plot > 0)[0]
 
         # todo: only test confidence score
