@@ -29,9 +29,11 @@ def pseudo_labeling(final_images, final_samples, k):
         for video in subject:
             samples_arr = []
             if (len(video)==0):
-                pseudo_y.append([0 for i in range(len(final_images[video_count])-k)]) #Last k frames are ignored
+                #pseudo_y.append([0 for i in range(len(final_images[video_count])-k)]) #Last k frames are ignored
+                pseudo_y.append([0 for i in range(len(final_images[video_count]))])
             else:
-                pseudo_y_each = [0]*(len(final_images[video_count])-k)
+                # pseudo_y_each = [0]*(len(final_images[video_count])-k)
+                pseudo_y_each = [0] * len(final_images[video_count])
                 '''for ME in video:
                     samples_arr.append(np.arange(ME[0]+1, ME[1]+1))
                 for ground_truth_arr in samples_arr: 
@@ -42,9 +44,9 @@ def pseudo_labeling(final_images, final_samples, k):
                             pseudo_y_each[index] = 1 '''
                 # changed to OB
                 for ME in video:
-                    samples_arr.append([int((ME[0] + 1 + ME[1] + 1) / 2), ME[1] - ME[0]])
-                for [index, length] in samples_arr:
-                    pseudo_y_each[index] = length
+                    samples_arr.append([ME[0], ME[1]+1])
+                for [start, end] in samples_arr:
+                    pseudo_y_each[start:end] = [end - start] * (end - start)
 
                 pseudo_y.append(pseudo_y_each)
             video_count+=1
@@ -128,6 +130,7 @@ def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count
                 path, winLen, p):
     prev = 0
     # todo: add smooth?
+    # todo: right one plus one in final samples!!
     for videoIndex, video in enumerate(final_samples[subject_count - 1]):
         preds = []
         gt = []
@@ -157,7 +160,7 @@ def spotting_ob(confidence_score, result, total_gt, final_samples, subject_count
                 plt.axvline(x=peak, color='g')
                 plt.axvline(x=peak + 2 * k, color='g')
         for samples in video:
-            gt.append([samples[0], 0, samples[1], 0, 0, 0, 0])
+            gt.append([samples[0], 0, samples[1] + 1, 0, 0, 0, 0])
             total_gt += 1
             if show_plot:
                 plt.axvline(x=samples[0], color='r')
@@ -195,9 +198,18 @@ def getSampleWeight(y_train, y_test, window_length, step):
     # changed to OB
     extended_y = []
     for i in range(0, len(y_train), step):
-        segment = np.sum(y_train[i:(i + window_length)])
-        if segment > 0:
-            segment = 1
+        segment = y_train[i:(i + window_length)]
+        if np.sum(segment) == 0:
+            segment = 0
+        else:
+            segment = np.array(segment)
+            ind = np.where(segment > 0)[0]
+            length = segment[ind[0]]
+            iou = len(ind) / (window_length + length - len(ind))
+            if iou >= 0.5:
+                segment = 1
+            else:
+                segment = 0
         extended_y.append(segment)
     class_sample_count = np.unique(extended_y, return_counts=True)[1]
 
@@ -208,6 +220,7 @@ def getSampleWeight(y_train, y_test, window_length, step):
     return samples_weight_train, samples_weight_test
     '''
     # changed to OB
+    weight = torch.from_numpy(weight)
     return weight
 
 
@@ -286,9 +299,9 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         confidence_score = []
         for test_x, _ in test_dataloader:
             test_x = test_x.to(DEVICE)
-            output = model(test_x)[0]
+            output = model(test_x) #[0]
             res = torch.zeros(window_length).to(DEVICE)
-            confidence_score.append(output[0])
+            confidence_score.append(output)
             # todo: only use confidence score
             '''if output[0] > p:
                 #ind = torch.round(output[1] * window_length).int()
@@ -300,7 +313,7 @@ def training(X, y, groupsLabel, dataset_name, expression_type, final_samples, k,
         confidence_score = torch.stack(confidence_score).unsqueeze(1)
 
         result = result.cpu().detach().numpy() # size: 1069, 1
-        confidence_score = confidence_score.cpu().detach().numpy()
+        confidence_score = confidence_score.cpu().detach().numpy().squeeze(-1)
         #assert result.shape[0] == len(y_test)
 
         preds, gt, total_gt = spotting_ob(confidence_score, result, total_gt, final_samples, subject_count, dataset, k, metric_fn,

@@ -14,9 +14,12 @@ def weighted_bce_loss(input, target, weight):
     bce = bce * weight
     return torch.sum(bce)
 
-def object_detection_loss(input, target, weight, mseLoss):
-    # todo: lambda, iou
-    b = target.size()[0]
+def object_detection_loss(input, target, weight):
+    x = torch.round(target).int().tolist()
+    samples_weight_test = weight[x]
+    return torch.sum(samples_weight_test * (input - target) ** 2)
+
+    '''b = target.size()[0]
     loss = 0
     for i in range(b):
         gt_object = target[i][0]
@@ -25,11 +28,11 @@ def object_detection_loss(input, target, weight, mseLoss):
         else:
             loss += (mseLoss(target[i][0], input[i][0]) * weight[1])  # todo: only use confidence score
     loss /= b
-    return loss
+    return loss'''
 
 def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS, class_weight):
-    loss_fn = weighted_mse_loss
-    mse_loss = torch.nn.MSELoss()
+    loss_fn = object_detection_loss
+    #mse_loss = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     def train_one_epoch(epoch_index, tb_writer=None):
@@ -51,7 +54,7 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS, 
             labels = labels.to(DEVICE)
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = object_detection_loss(outputs, labels, class_weight, mse_loss)
+            loss = loss_fn(outputs, labels, class_weight)
 
             loss.backward()
             optimizer.step()
@@ -96,7 +99,7 @@ def train_with_pytorch(model, training_loader, validation_loader, path, EPOCHS, 
             inputs = inputs.to(DEVICE)
             labels = labels.to(DEVICE)
             outputs = model(inputs)
-            vloss = object_detection_loss(outputs, labels, class_weight, mse_loss)
+            vloss = loss_fn(outputs, labels, class_weight)
 
             running_vloss += vloss
 

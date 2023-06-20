@@ -67,13 +67,13 @@ class Multitask_transformer(nn.Module):
             #x += self.pos_embedding[:, :(n + 1)]
             x = self.transformer_encoder(x) # batch, seq, feature
         if self.add_token:
-            x = x[:, 1:, :]
-        '''x = self.readout(x)
+            x = x[:, 0, :]
+        x = self.readout(x)
         x = self.readout2(x)
         #x = self.sigmoid(x)
-        return x.squeeze(-1)'''
+        return x.squeeze(-1)
 
         # changed to OB:
-        x = self.conv1d(x) # 2, 1, 400
+        '''x = self.conv1d(x) # 2, 1, 400
         x = self.readout3(x)
-        return x.squeeze(1)
+        return x.squeeze(1)'''

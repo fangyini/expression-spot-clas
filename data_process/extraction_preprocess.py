@@ -49,7 +49,8 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
             phase_sin = phase[1] #len, H, W
 
             OFF_video = []
-            for img_count in range(final_images[video].shape[0] - k):
+            #for img_count in range(final_images[video].shape[0] - k):
+            for img_count in range(final_images[video].shape[0]):
                 if (img_count == 0):
                     img1 = final_images[video][img_count]
                     reference_img = img1
@@ -114,8 +115,12 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
                     y54 = min(shape[57][1] + pad2, sizeF)
 
                 # phase difference from [video][img_count] to [video][img_count+k]
-                cosdiff = phase_cos[(img_count+1):(img_count+k)].sum(axis=0)
-                sindiff = phase_sin[(img_count+1):(img_count+k)].sum(axis=0)
+                #cosdiff = phase_cos[(img_count+1):(img_count+k)].sum(axis=0)
+                #sindiff = phase_sin[(img_count+1):(img_count+k)].sum(axis=0)
+
+                #changed to consecutive frame difference
+                cosdiff = phase_cos[img_count].copy()
+                sindiff = phase_sin[img_count].copy()
 
                 # Eye masking
                 left_eye = [(x11, y11), (x12, y12), (x13, y13), (x14, y14), (x15, y15), (x16, y16)]
@@ -133,8 +138,10 @@ def extract_preprocess(final_images, k, final_names, dataset_name, fromSaved=Tru
                 cosdiff=final_image[:,:,0]
                 sindiff=final_image[:,:,1]
 
-                cosdiff=(cosdiff-cosdiff.mean())/cosdiff.std()
-                sindiff = (sindiff - sindiff.mean())/sindiff.std()
+                if cosdiff.sum() != 0:
+                    cosdiff=(cosdiff-cosdiff.mean())/cosdiff.std()
+                if sindiff.sum() != 0:
+                    sindiff = (sindiff - sindiff.mean())/sindiff.std()
                 magnitude = (cosdiff ** 2 + sindiff ** 2) ** 0.5
                 final_image[:,:,2]=magnitude
 
